@@ -37,31 +37,40 @@ class GenAIExplanationEngine:
         
         if subscores.get("text_similarity", 0) >= 0.70:
             evidence_points.append(
-                f"High semantic text similarity ({int(subscores['text_similarity']*100)}%): Both descriptions refer to similar items ('{lost_desc}' vs '{found_desc}')."
+                f"High semantic text similarity ({round(subscores['text_similarity']*100)}%): Both descriptions refer to similar items ('{lost_desc}' vs '{found_desc}')."
             )
         else:
             evidence_points.append(
-                f"Moderate text similarity ({int(subscores['text_similarity']*100)}%): Descriptions share partial keyword context."
+                f"Moderate text similarity ({round(subscores['text_similarity']*100)}%): Descriptions share partial keyword context."
             )
             
-        if subscores.get("image_similarity", 0) >= 0.75:
+        image_sim = subscores.get("image_similarity")
+        if image_sim is None:
             evidence_points.append(
-                f"High visual similarity ({int(subscores['image_similarity']*100)}%): Uploaded image feature embeddings show matching visual geometry, color distribution, and item structure."
+                "Visual similarity was not used because a photo is not available for both reports; the score is based on the remaining evidence."
+            )
+        elif image_sim >= 0.75:
+            evidence_points.append(
+                f"High visual similarity ({round(image_sim*100)}%): Uploaded image feature embeddings show matching visual geometry, color distribution, and item structure."
+            )
+        else:
+            evidence_points.append(
+                f"Limited visual similarity ({round(image_sim*100)}%): The uploaded photos differ noticeably in appearance."
             )
             
         if subscores.get("location_similarity", 0) >= 0.80:
             evidence_points.append(
-                f"Spatial proximity ({int(subscores['location_similarity']*100)}%): Lost location ('{lost_loc}') and found location ('{found_loc}') are within close physical proximity on SRM campus."
+                f"Spatial proximity ({round(subscores['location_similarity']*100)}%): Lost location ('{lost_loc}') and found location ('{found_loc}') are within close physical proximity on SRM campus."
             )
             
         if subscores.get("time_similarity", 0) >= 0.75:
             evidence_points.append(
-                f"Temporal compatibility ({int(subscores['time_similarity']*100)}%): The lost timestamp and found timestamp occurred within an expected sequential timeframe."
+                f"Temporal compatibility ({round(subscores['time_similarity']*100)}%): The lost timestamp and found timestamp occurred within an expected sequential timeframe."
             )
             
         # Compose natural language explanation text
         explanation_text = (
-            f"SRM CampusFind AI identified this pair as a {classification} with an overall match confidence of {int(final_score*100)}%. "
+            f"SRM CampusFind AI identified this pair as a {classification} with an overall match confidence of {round(final_score*100)}%. "
             f"The model reached this decision because: " + " ".join(evidence_points) + " "
             "Please verify ownership through the SRM Lost-and-Found Security desk before claiming."
         )

@@ -64,10 +64,15 @@ srm-campusfind/
 
 ## 🚀 Quick Start Guide
 
+**Windows (easiest):** double-click **`run.bat`**. On first run it creates a virtual environment and installs everything, then starts the server and opens the browser.
+
 ### 1. Install Dependencies
 ```bash
-pip install -r requirements.txt
+python -m venv venv
+venv\Scriptsctivate          # macOS/Linux: source venv/bin/activate
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 ```
+On first start the server downloads the `all-MiniLM-L6-v2` text model (~90 MB) and ResNet18 weights (~45 MB).
 
 ### 2. Run Experimental Model Evaluation Benchmark
 Execute the benchmark suite comparing **Baseline 1 (Keyword)**, **Baseline 2 (TF-IDF)**, **Baseline 3 (Transformer Text)**, **Baseline 4 (Image Only)**, and the **Proposed Multimodal Model**:
@@ -91,9 +96,16 @@ Open your browser and navigate to:
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Baseline 1 (Keyword)** | 0.1250 | 0.0000 | 0.0000 | 0.0000 | 0.8750 | 1.0000 | 0.9375 |
 | **Baseline 2 (TF-IDF)** | 0.2500 | 1.0000 | 0.2500 | 0.4000 | 1.0000 | 1.0000 | 1.0000 |
-| **Baseline 3 (Transformer Text)** | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 1.0000 | 1.0000 | 1.0000 |
-| **Baseline 4 (Image Only)** | 0.2500 | 0.2500 | 1.0000 | 0.4000 | 0.2500 | 0.6250 | 0.4937 |
+| **Baseline 3 (Transformer Text)** | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| **Baseline 4 (Image Only)** | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 | **Proposed Multimodal Model** | **1.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** | **1.0000** |
+
+*Measured on the 8 curated lost→found query pairs with the real `all-MiniLM-L6-v2` Sentence-Transformer and ResNet18 encoders (`python -m src.evaluation.evaluator`).*
+
+**Notes on these results**
+- **Image Only is N/A** because the curated test set contains no item photos, so a purely visual baseline cannot be measured. Visual matching is fully active in the app whenever photos are uploaded with a report and/or a search.
+- **Missing-modality handling:** when either report has no photo, the fusion engine drops the visual term and renormalizes the remaining weights (text, location, time, attributes) so they still sum to 1, rather than comparing placeholder vectors.
+- On this small curated set the Transformer text baseline already ranks every pair correctly, so the proposed model ties it here. The extra signals (photo, location, time, attributes) matter when descriptions are vague or several items share similar wording.
 
 ---
 

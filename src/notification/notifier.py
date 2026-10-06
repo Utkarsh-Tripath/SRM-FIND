@@ -48,7 +48,7 @@ class NotificationManager:
         
         if triggered:
             self.notification_log.append(notification_payload)
-            print(f"[NotificationManager] 🔔 ALERT TRIGGERED: Match {lost_report.get('id')} <-> {found_report.get('id')} (Score: {score:.2f})")
+            print(f"[NotificationManager] ALERT TRIGGERED: Match {lost_report.get('id')} <-> {found_report.get('id')} (Score: {score:.2f})")
             
         return notification_payload
 

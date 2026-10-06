@@ -4,285 +4,363 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SRM CampusFind — Multimodal Lost & Found System</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-icon">⚡</div>
-                <div>
-                    <h2>SRM CampusFind</h2>
-                    <span class="sub-brand">Multimodal GenAI System</span>
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+        <button class="burger-btn" id="burger-btn" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">
+            <span class="burger-line"></span>
+            <span class="burger-line"></span>
+            <span class="burger-line"></span>
+            <span class="burger-dot hidden" id="burger-dot"></span>
+        </button>
+
+        <a class="brand" href="#" onclick="openTab('tab-matching'); return false;">
+            <div class="brand-icon">⚡</div>
+            <div>
+                <div class="brand-name">SRM CampusFind</div>
+                <div class="brand-sub">Multimodal GenAI Lost &amp; Found</div>
+            </div>
+        </a>
+
+        <div class="nav-status">
+            <span class="status-indicator"></span>
+            <span id="nav-status-text">Engine online</span>
+        </div>
+    </header>
+
+    <!-- Slide-out Navigation Menu -->
+    <aside class="sidebar" id="sidebar" aria-hidden="true">
+        <div class="sidebar-label">Navigation</div>
+        <nav class="nav-menu">
+            <button class="nav-btn active" data-tab="tab-matching">
+                <span class="icon">🔍</span>
+                <span class="nav-text"><strong>Multimodal Matching</strong><small>Search found items with AI</small></span>
+            </button>
+            <button class="nav-btn" data-tab="tab-report">
+                <span class="icon">➕</span>
+                <span class="nav-text"><strong>Report Item</strong><small>Log a lost or found item</small></span>
+            </button>
+            <button class="nav-btn" data-tab="tab-evaluation">
+                <span class="icon">📊</span>
+                <span class="nav-text"><strong>Baseline Evaluation</strong><small>Benchmark vs baselines</small></span>
+            </button>
+            <button class="nav-btn" data-tab="tab-mapping">
+                <span class="icon">🗺️</span>
+                <span class="nav-text"><strong>Objective Mapping</strong><small>Course objectives → modules</small></span>
+            </button>
+            <button class="nav-btn" data-tab="tab-notifications">
+                <span class="icon">🔔</span>
+                <span class="nav-text"><strong>Notifications</strong><small>High-confidence alerts</small></span>
+                <span id="notif-badge" class="badge">0</span>
+            </button>
+        </nav>
+
+        <div class="system-status-card">
+            <div class="status-indicator"></div>
+            <div>
+                <div class="status-title">Vector Engine Online</div>
+                <div class="status-sub" id="stat-records">Loading index…</div>
+            </div>
+        </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <div class="page-header">
+            <div class="header-titles">
+                <h1 id="page-title">Intelligent Multimodal Matching Engine</h1>
+                <p id="page-subtitle">Semantic NLP + Vision Encoder + Geo-Temporal Fusion + GenAI Explanations</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="openTab('tab-evaluation'); runBenchmark()">⚡ Run Benchmark Suite</button>
+            </div>
+        </div>
+
+        <!-- TAB 1: Multimodal Search & Matching -->
+        <section id="tab-matching" class="tab-content active">
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-total">–</div>
+                    <div class="stat-label">Indexed reports</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value stat-lost" id="stat-lost">–</div>
+                    <div class="stat-label">Lost items</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value stat-found" id="stat-found">–</div>
+                    <div class="stat-label">Found items</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value stat-alerts" id="stat-alerts">0</div>
+                    <div class="stat-label">Match alerts</div>
                 </div>
             </div>
 
-            <nav class="nav-menu">
-                <button class="nav-btn active" data-tab="tab-matching">
-                    <span class="icon">🔍</span> Multimodal Matching
-                </button>
-                <button class="nav-btn" data-tab="tab-report">
-                    <span class="icon">➕</span> Report Item
-                </button>
-                <button class="nav-btn" data-tab="tab-evaluation">
-                    <span class="icon">📊</span> Baseline Evaluation
-                </button>
-                <button class="nav-btn" data-tab="tab-mapping">
-                    <span class="icon">🗺️</span> Objective Mapping
-                </button>
-                <button class="nav-btn" data-tab="tab-notifications">
-                    <span class="icon">🔔</span> Notifications <span id="notif-badge" class="badge">0</span>
-                </button>
-            </nav>
+            <div class="grid-2col">
+                <!-- Query Input Card -->
+                <div class="card">
+                    <h3>Search for a Lost Item</h3>
+                    <p class="card-desc">Describe what you lost, or try a preset SRM campus scenario.</p>
 
-            <div class="system-status-card">
-                <div class="status-indicator"></div>
-                <div>
-                    <div class="status-title">Vector Engine Online</div>
-                    <div class="status-sub" id="stat-records">16 Indexed Embeddings</div>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <!-- Header Bar -->
-            <header class="top-header">
-                <div>
-                    <h1 id="page-title">Intelligent Multimodal Matching Engine</h1>
-                    <p id="page-subtitle">Semantic NLP + Vision Encoder + Geo-Temporal Fusion + GenAI Explanations</p>
-                </div>
-                <div class="header-actions">
-                    <button class="btn btn-secondary" onclick="runBenchmark()">⚡ Run Benchmark Suite</button>
-                </div>
-            </header>
-
-            <!-- TAB 1: Multimodal Search & Matching -->
-            <section id="tab-matching" class="tab-content active">
-                <div class="grid-2col">
-                    <!-- Query Input Card -->
-                    <div class="card">
-                        <h3>Query Lost Item Report</h3>
-                        <p class="card-desc">Enter a lost item description or pick a preset SRM campus scenario.</p>
-
-                        <div class="preset-pills">
-                            <button class="pill-btn" onclick="loadPreset(0)">🎧 Black Earbuds at Library</button>
-                            <button class="pill-btn" onclick="loadPreset(1)">🎒 Navy Nike Bag at Tech Park</button>
-                            <button class="pill-btn" onclick="loadPreset(2)">🪪 SRM ID Card at UB</button>
-                            <button class="pill-btn" onclick="loadPreset(3)">⌚ Apple Watch at Sports Complex</button>
-                        </div>
-
-                        <form id="search-form" onsubmit="executeSearch(event)">
-                            <div class="form-group">
-                                <label>Description</label>
-                                <textarea id="query-desc" rows="3" required placeholder="Describe lost item (e.g. I misplaced my black wireless earbuds near central library)"></textarea>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Category</label>
-                                    <select id="query-cat">
-                                        <option value="electronics">Electronics</option>
-                                        <option value="bags">Bags & Luggage</option>
-                                        <option value="documents">Documents & IDs</option>
-                                        <option value="accessories">Accessories</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Color</label>
-                                    <input type="text" id="query-color" placeholder="e.g. black">
-                                </div>
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Location Coordinates (Lat, Lon)</label>
-                                    <input type="text" id="query-coords" value="12.8231, 80.0442">
-                                </div>
-                                <div class="form-group">
-                                    <label>Simulated Timestamp</label>
-                                    <input type="text" id="query-time" value="2026-10-04T10:30:00">
-                                </div>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary btn-block">🚀 Run Multimodal Candidate Match</button>
-                        </form>
+                    <div class="preset-pills">
+                        <button type="button" class="pill-btn" onclick="loadPreset(0)">🎧 Black Earbuds at Library</button>
+                        <button type="button" class="pill-btn" onclick="loadPreset(1)">🎒 Navy Nike Bag at Tech Park</button>
+                        <button type="button" class="pill-btn" onclick="loadPreset(2)">🪪 SRM ID Card at UB</button>
+                        <button type="button" class="pill-btn" onclick="loadPreset(3)">⌚ Apple Watch at Sports Complex</button>
                     </div>
 
-                    <!-- Match Results Panel -->
-                    <div class="card">
-                        <h3>Top Candidate Matches</h3>
-                        <div id="results-loader" class="loader hidden">Searching vector index & fusing embeddings...</div>
-                        <div id="results-container">
-                            <div class="placeholder-state">
-                                <span>💡</span>
-                                <p>Select a preset or click "Run Multimodal Candidate Match" to evaluate AI predictions.</p>
-                            </div>
+                    <form id="search-form" onsubmit="executeSearch(event)">
+                        <div class="form-group">
+                            <label for="query-desc">Description</label>
+                            <textarea id="query-desc" rows="3" required placeholder="e.g. I misplaced my black wireless earbuds near the central library"></textarea>
                         </div>
-                    </div>
-                </div>
-            </section>
 
-            <!-- TAB 2: Report Item -->
-            <section id="tab-report" class="tab-content">
-                <div class="card max-w-700">
-                    <h3>Report a Lost or Found Item</h3>
-                    <p class="card-desc">Submitting a report automatically generates structured embeddings and indexes the record in the vector database.</p>
-
-                    <form id="report-form" onsubmit="submitReport(event)">
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Report Type</label>
-                                <select id="rep-status" required>
-                                    <option value="LOST">I LOST an Item</option>
-                                    <option value="FOUND">I FOUND an Item</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Category</label>
-                                <select id="rep-category">
+                                <label for="query-cat">Category</label>
+                                <select id="query-cat">
                                     <option value="electronics">Electronics</option>
-                                    <option value="bags">Bags</option>
-                                    <option value="documents">Documents</option>
+                                    <option value="bags">Bags & Luggage</option>
+                                    <option value="documents">Documents & IDs</option>
                                     <option value="accessories">Accessories</option>
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Description</label>
-                            <textarea id="rep-desc" rows="3" required placeholder="Provide item description..."></textarea>
+                            <div class="form-group">
+                                <label for="query-color">Color</label>
+                                <input type="text" id="query-color" placeholder="e.g. black">
+                            </div>
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Brand</label>
-                                <input type="text" id="rep-brand" placeholder="e.g. Apple, Boat, Nike">
+                                <label for="query-location">Where did you lose it?</label>
+                                <select id="query-location" class="location-select"></select>
                             </div>
                             <div class="form-group">
-                                <label>Color</label>
-                                <input type="text" id="rep-color" placeholder="e.g. Space Grey, Black">
+                                <label for="query-time">When?</label>
+                                <input type="datetime-local" id="query-time" value="2026-10-04T10:30">
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label>SRM Location Name</label>
-                            <input type="text" id="rep-location" required placeholder="e.g. Tech Park 6th Floor Lab, Java Canteen">
+                            <label>Photo <span class="optional">(optional — enables visual matching)</span></label>
+                            <div class="dropzone">
+                                <input type="file" accept="image/*" class="dropzone-input" id="query-photo">
+                                <div class="dropzone-empty">
+                                    <span class="dropzone-icon">📷</span>
+                                    <span><strong>Click to upload</strong> or drag a photo here</span>
+                                </div>
+                                <div class="dropzone-preview hidden">
+                                    <img alt="Selected photo preview">
+                                    <button type="button" class="dropzone-remove" aria-label="Remove photo">✕</button>
+                                </div>
+                            </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary">Publish Report & Index Vector</button>
+                        <button type="submit" class="btn btn-primary btn-block">🚀 Run Multimodal Candidate Match</button>
                     </form>
                 </div>
-            </section>
 
-            <!-- TAB 3: Evaluation -->
-            <section id="tab-evaluation" class="tab-content">
+                <!-- Match Results Panel -->
                 <div class="card">
-                    <h3>Experimental Baseline Comparison Table</h3>
-                    <p class="card-desc">Benchmarking Keyword Matching vs TF-IDF vs Transformer Text vs Vision vs Proposed Multimodal Model.</p>
-
-                    <div class="table-responsive">
-                        <table class="data-table" id="eval-table">
-                            <thead>
-                                <tr>
-                                    <th>Model Architecture</th>
-                                    <th>Accuracy</th>
-                                    <th>Precision</th>
-                                    <th>Recall</th>
-                                    <th>F1 Score</th>
-                                    <th>Recall@1</th>
-                                    <th>Recall@3</th>
-                                    <th>MRR</th>
-                                </tr>
-                            </thead>
-                            <tbody id="eval-tbody">
-                                <tr><td colspan="8">Click "Run Benchmark Suite" or load evaluation data...</td></tr>
-                            </tbody>
-                        </table>
+                    <div class="results-head">
+                        <h3>Top Candidate Matches</h3>
+                        <span class="results-count" id="results-count"></span>
+                    </div>
+                    <div id="results-container">
+                        <div class="placeholder-state">
+                            <span class="placeholder-icon">💡</span>
+                            <p>Pick a preset or describe your item, then run a match to see AI-ranked found items with explanations.</p>
+                        </div>
                     </div>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <!-- TAB 4: Mapping -->
-            <section id="tab-mapping" class="tab-content">
-                <div class="card">
-                    <h3>Course Requirement: Objective-to-Module Mapping</h3>
-                    <p class="card-desc">Direct mapping of academic project requirements to implemented AI techniques and models.</p>
+        <!-- TAB 2: Report Item -->
+        <section id="tab-report" class="tab-content">
+            <div class="card max-w-760">
+                <h3>Item Details</h3>
+                <p class="card-desc">Submitting a report generates text and image embeddings and indexes the record in the vector database instantly.</p>
 
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Project Objective</th>
-                                    <th>AI Technique</th>
-                                    <th>Model / Architecture</th>
-                                    <th>Input</th>
-                                    <th>Output</th>
-                                    <th>Evaluation Metric</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><strong>1. Semantic Matching</strong></td>
-                                    <td>NLP + Transformers</td>
-                                    <td>Sentence-Transformer (all-MiniLM-L6-v2)</td>
-                                    <td>Text Descriptions</td>
-                                    <td>384-dim Embeddings & Cosine Score</td>
-                                    <td>Recall@K, F1 Score</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>2. Visual Similarity</strong></td>
-                                    <td>Deep Learning / CV</td>
-                                    <td>ResNet18 / Composite Vision Vectorizer</td>
-                                    <td>Item Images</td>
-                                    <td>512-dim Feature Vectors</td>
-                                    <td>Precision, Recall</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>3. Multimodal Fusion</strong></td>
-                                    <td>Feature Weighting & Decay</td>
-                                    <td>Weighted Similarity Engine</td>
-                                    <td>Text + Image + Geo + Time + Attr</td>
-                                    <td>Unified Confidence Score</td>
-                                    <td>F1, Accuracy</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>4. Match Explanation</strong></td>
-                                    <td>Generative AI</td>
-                                    <td>GenAI Explanation Engine</td>
-                                    <td>Evidence metadata & Subscores</td>
-                                    <td>Natural Language Explanation</td>
-                                    <td>Faithfulness & Grounding</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>5. Automated Alerts</strong></td>
-                                    <td>Application Logic</td>
-                                    <td>Notification Manager</td>
-                                    <td>Match Result > 0.75 Score</td>
-                                    <td>In-App & Email Alerts</td>
-                                    <td>Delivery Reliability</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                <form id="report-form" onsubmit="submitReport(event)">
+                    <div class="segmented" role="radiogroup" aria-label="Report type">
+                        <label><input type="radio" name="rep-status" value="LOST" checked><span>😟 I lost an item</span></label>
+                        <label><input type="radio" name="rep-status" value="FOUND"><span>🙌 I found an item</span></label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rep-desc">Description</label>
+                        <textarea id="rep-desc" rows="3" required placeholder="e.g. Grey HP laptop in a black sleeve with stickers on the lid"></textarea>
+                    </div>
+
+                    <div class="form-row form-row-3">
+                        <div class="form-group">
+                            <label for="rep-category">Category</label>
+                            <select id="rep-category">
+                                <option value="electronics">Electronics</option>
+                                <option value="bags">Bags</option>
+                                <option value="documents">Documents</option>
+                                <option value="accessories">Accessories</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="rep-brand">Brand</label>
+                            <input type="text" id="rep-brand" placeholder="e.g. Apple, Boat">
+                        </div>
+                        <div class="form-group">
+                            <label for="rep-color">Color</label>
+                            <input type="text" id="rep-color" placeholder="e.g. Black">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rep-location">Campus location</label>
+                            <select id="rep-location" class="location-select"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="rep-location-detail">Exact spot <span class="optional">(optional)</span></label>
+                            <input type="text" id="rep-location-detail" placeholder="e.g. 2nd floor, near lab 602">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Photo <span class="optional">(recommended)</span></label>
+                        <div class="dropzone">
+                            <input type="file" accept="image/*" class="dropzone-input" id="rep-photo">
+                            <div class="dropzone-empty">
+                                <span class="dropzone-icon">📷</span>
+                                <span><strong>Click to upload</strong> or drag a photo here</span>
+                            </div>
+                            <div class="dropzone-preview hidden">
+                                <img alt="Selected photo preview">
+                                <button type="button" class="dropzone-remove" aria-label="Remove photo">✕</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Publish Report & Index Vector</button>
+                    <div id="report-status" class="form-status hidden" role="status"></div>
+                </form>
+            </div>
+        </section>
+
+        <!-- TAB 3: Evaluation -->
+        <section id="tab-evaluation" class="tab-content">
+            <div class="card">
+                <h3>Experimental Baseline Comparison Table</h3>
+                <p class="card-desc">Benchmarking Keyword Matching vs TF-IDF vs Transformer Text vs Vision vs Proposed Multimodal Model on the curated SRM test pairs.</p>
+
+                <div class="table-responsive">
+                    <table class="data-table" id="eval-table">
+                        <thead>
+                            <tr>
+                                <th>Model Architecture</th>
+                                <th>Accuracy</th>
+                                <th>Precision</th>
+                                <th>Recall</th>
+                                <th>F1 Score</th>
+                                <th>Recall@1</th>
+                                <th>Recall@3</th>
+                                <th>MRR</th>
+                            </tr>
+                        </thead>
+                        <tbody id="eval-tbody">
+                            <tr><td colspan="8">Click "Run Benchmark Suite" or load evaluation data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="table-note" id="eval-note"></p>
+            </div>
+        </section>
+
+        <!-- TAB 4: Mapping -->
+        <section id="tab-mapping" class="tab-content">
+            <div class="card">
+                <h3>Course Requirement: Objective-to-Module Mapping</h3>
+                <p class="card-desc">Direct mapping of academic project requirements to implemented AI techniques and models.</p>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Project Objective</th>
+                                <th>AI Technique</th>
+                                <th>Model / Architecture</th>
+                                <th>Input</th>
+                                <th>Output</th>
+                                <th>Evaluation Metric</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>1. Semantic Matching</strong></td>
+                                <td>NLP + Transformers</td>
+                                <td>Sentence-Transformer (all-MiniLM-L6-v2)</td>
+                                <td>Text Descriptions</td>
+                                <td>384-dim Embeddings & Cosine Score</td>
+                                <td>Recall@K, F1 Score</td>
+                            </tr>
+                            <tr>
+                                <td><strong>2. Visual Similarity</strong></td>
+                                <td>Deep Learning / CV</td>
+                                <td>ResNet18 / Composite Vision Vectorizer</td>
+                                <td>Item Images</td>
+                                <td>512-dim Feature Vectors</td>
+                                <td>Precision, Recall</td>
+                            </tr>
+                            <tr>
+                                <td><strong>3. Multimodal Fusion</strong></td>
+                                <td>Feature Weighting & Decay</td>
+                                <td>Weighted Similarity Engine</td>
+                                <td>Text + Image + Geo + Time + Attr</td>
+                                <td>Unified Confidence Score</td>
+                                <td>F1, Accuracy</td>
+                            </tr>
+                            <tr>
+                                <td><strong>4. Match Explanation</strong></td>
+                                <td>Generative AI</td>
+                                <td>GenAI Explanation Engine</td>
+                                <td>Evidence metadata & Subscores</td>
+                                <td>Natural Language Explanation</td>
+                                <td>Faithfulness & Grounding</td>
+                            </tr>
+                            <tr>
+                                <td><strong>5. Automated Alerts</strong></td>
+                                <td>Application Logic</td>
+                                <td>Notification Manager</td>
+                                <td>Match Result > 0.75 Score</td>
+                                <td>In-App & Email Alerts</td>
+                                <td>Delivery Reliability</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: Notifications -->
+        <section id="tab-notifications" class="tab-content">
+            <div class="card">
+                <h3>Automated Match Notifications Ledger</h3>
+                <p class="card-desc">Alerts dispatched when a candidate's multimodal score reaches the 0.75 confidence threshold.</p>
+                <div id="notif-list">
+                    <div class="placeholder-state">
+                        <span class="placeholder-icon">🔕</span>
+                        <p>No notifications triggered yet. Run a match search to generate alerts.</p>
                     </div>
                 </div>
-            </section>
+            </div>
+        </section>
+    </main>
 
-            <!-- TAB 5: Notifications -->
-            <section id="tab-notifications" class="tab-content">
-                <div class="card">
-                    <h3>Automated Match Notifications Ledger</h3>
-                    <p class="card-desc">Alerts dispatched when candidate multimodal score exceeds the 0.75 confidence threshold.</p>
-                    <div id="notif-list">
-                        <p class="placeholder-state">No notifications triggered yet. Run a search matching query above.</p>
-                    </div>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=4"></script>
 </body>
 </html>

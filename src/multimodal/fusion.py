@@ -7,7 +7,7 @@ and ablation study runner.
 
 import math
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate distance in meters between two GPS coordinates using Haversine formula."""
@@ -102,25 +102,41 @@ class MultimodalFusionEngine:
             for k in self.weights:
                 self.weights[k] /= total
 
+    @staticmethod
+    def _weighted_average(pairs) -> float:
+        """Weighted average over (weight, score) pairs, skipping missing (None) scores."""
+        available = [(w, s) for w, s in pairs if s is not None]
+        total_w = sum(w for w, _ in available)
+        if total_w == 0:
+            return 0.0
+        return sum(w * s for w, s in available) / total_w
+
     def fuse(
-        self, 
-        text_sim: float, 
-        image_sim: float, 
-        location_sim: float, 
-        time_sim: float, 
+        self,
+        text_sim: float,
+        image_sim: Optional[float],
+        location_sim: float,
+        time_sim: float,
         attribute_sim: float
     ) -> Dict[str, Any]:
         """
         Compute final multimodal score:
         Final Score = w1*St + w2*Si + w3*Sl + w4*Stime + w5*Sattr
+        If no photo is available (image_sim is None), the visual term is dropped and
+        the remaining weights are renormalized to sum to 1 (missing-modality handling).
         """
-        final_score = (
-            self.weights["w_text"] * text_sim +
-            self.weights["w_image"] * image_sim +
-            self.weights["w_location"] * location_sim +
-            self.weights["w_time"] * time_sim +
-            self.weights["w_attribute"] * attribute_sim
-        )
+        weights_used = dict(self.weights)
+        if image_sim is None:
+            remaining = (1.0 - weights_used["w_image"]) or 1.0
+            weights_used = {k: (0.0 if k == "w_image" else v / remaining) for k, v in weights_used.items()}
+
+        final_score = self._weighted_average([
+            (self.weights["w_text"], text_sim),
+            (self.weights["w_image"], image_sim),
+            (self.weights["w_location"], location_sim),
+            (self.weights["w_time"], time_sim),
+            (self.weights["w_attribute"], attribute_sim)
+        ])
         
         # Determine confidence classification label
         if final_score >= self.HIGH_CONFIDENCE_THRESHOLD:
@@ -135,29 +151,30 @@ class MultimodalFusionEngine:
             "classification": classification,
             "subscores": {
                 "text_similarity": round(float(text_sim), 4),
-                "image_similarity": round(float(image_sim), 4),
+                "image_similarity": None if image_sim is None else round(float(image_sim), 4),
                 "location_similarity": round(float(location_sim), 4),
                 "time_similarity": round(float(time_sim), 4),
                 "attribute_similarity": round(float(attribute_sim), 4)
             },
-            "weights_used": {k: round(v, 4) for k, v in self.weights.items()}
+            "weights_used": {k: round(v, 4) for k, v in weights_used.items()}
         }
 
     def run_ablation(
-        self, 
-        text_sim: float, 
-        image_sim: float, 
-        location_sim: float, 
-        time_sim: float, 
+        self,
+        text_sim: float,
+        image_sim: Optional[float],
+        location_sim: float,
+        time_sim: float,
         attribute_sim: float
-    ) -> Dict[str, float]:
-        """Run Ablation Study showing performance across feature subsets."""
+    ) -> Dict[str, Optional[float]]:
+        """Run Ablation Study showing performance across feature subsets (image terms skipped if no photo)."""
+        avg = self._weighted_average
         return {
             "Text Only": round(text_sim, 4),
-            "Image Only": round(image_sim, 4),
-            "Text + Image": round(0.55 * text_sim + 0.45 * image_sim, 4),
-            "Text + Image + Location": round(0.45 * text_sim + 0.35 * image_sim + 0.20 * location_sim, 4),
-            "Text + Image + Location + Time": round(0.40 * text_sim + 0.30 * image_sim + 0.15 * location_sim + 0.15 * time_sim, 4),
+            "Image Only": None if image_sim is None else round(image_sim, 4),
+            "Text + Image": round(avg([(0.55, text_sim), (0.45, image_sim)]), 4),
+            "Text + Image + Location": round(avg([(0.45, text_sim), (0.35, image_sim), (0.20, location_sim)]), 4),
+            "Text + Image + Location + Time": round(avg([(0.40, text_sim), (0.30, image_sim), (0.15, location_sim), (0.15, time_sim)]), 4),
             "Full Multimodal": self.fuse(text_sim, image_sim, location_sim, time_sim, attribute_sim)["final_score"]
         }
 

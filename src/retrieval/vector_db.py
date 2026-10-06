@@ -5,7 +5,7 @@ and multimodal record lookup.
 """
 
 import numpy as np
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Optional, Tuple
 
 
 class VectorDatabase:
@@ -17,7 +17,7 @@ class VectorDatabase:
     def __init__(self):
         self.records: List[Dict[str, Any]] = []
         self.text_embeddings: List[np.ndarray] = []
-        self.image_embeddings: List[np.ndarray] = []
+        self.image_embeddings: List[Optional[np.ndarray]] = []
 
     def clear(self):
         self.records = []
@@ -28,9 +28,9 @@ class VectorDatabase:
         self, 
         record: Dict[str, Any], 
         text_emb: np.ndarray, 
-        image_emb: np.ndarray
+        image_emb: Optional[np.ndarray]
     ):
-        """Add a lost/found report record with its text and image embeddings."""
+        """Add a lost/found report record with its text and image embeddings (image_emb is None if no photo)."""
         self.records.append(record)
         
         # Ensure vectors are 1D normalized numpy arrays
@@ -39,24 +39,30 @@ class VectorDatabase:
         if t_norm > 0:
             t_vec = t_vec / t_norm
             
-        i_vec = np.array(image_emb).flatten()
-        i_norm = np.linalg.norm(i_vec)
-        if i_norm > 0:
-            i_vec = i_vec / i_norm
+        i_vec = self._normalize(image_emb)
             
         self.text_embeddings.append(t_vec)
         self.image_embeddings.append(i_vec)
 
+    @staticmethod
+    def _normalize(vec: Optional[np.ndarray]) -> Optional[np.ndarray]:
+        if vec is None:
+            return None
+        v = np.array(vec).flatten()
+        norm = np.linalg.norm(v)
+        return v / norm if norm > 0 else v
+
     def search(
         self, 
         query_text_emb: np.ndarray, 
-        query_image_emb: np.ndarray, 
+        query_image_emb: Optional[np.ndarray], 
         target_status: str = "FOUND", 
         top_k: int = 5
     ) -> List[Tuple[Dict[str, Any], float, float]]:
         """
         Search top-K nearest records matching target status (e.g. searching LOST queries against FOUND records).
-        Returns list of tuples: (record, text_sim, image_sim)
+        Returns list of tuples: (record, text_sim, image_sim).
+        image_sim is None when either the query or the record has no photo.
         """
         if not self.records:
             return []
@@ -66,10 +72,7 @@ class VectorDatabase:
         if q_t_norm > 0:
             q_text = q_text / q_t_norm
             
-        q_image = np.array(query_image_emb).flatten()
-        q_i_norm = np.linalg.norm(q_image)
-        if q_i_norm > 0:
-            q_image = q_image / q_i_norm
+        q_image = self._normalize(query_image_emb)
             
         candidate_results = []
         
@@ -83,16 +86,17 @@ class VectorDatabase:
             
             # Vector Dot Product (Cosine Similarity since vectors are normalized)
             text_sim = float(np.dot(q_text, t_vec)) if len(q_text) == len(t_vec) else 0.5
-            image_sim = float(np.dot(q_image, i_vec)) if len(q_image) == len(i_vec) else 0.5
+            image_sim = None
+            if q_image is not None and i_vec is not None and len(q_image) == len(i_vec):
+                image_sim = max(0.0, min(1.0, float(np.dot(q_image, i_vec))))
             
             # Clip between [0, 1]
             text_sim = max(0.0, min(1.0, text_sim))
-            image_sim = max(0.0, min(1.0, image_sim))
             
             candidate_results.append((rec, text_sim, image_sim))
             
-        # Sort by initial average text + image similarity descending
-        candidate_results.sort(key=lambda x: (x[1] * 0.5 + x[2] * 0.5), reverse=True)
+        # Sort by average text + image similarity (text only when no photo is available)
+        candidate_results.sort(key=lambda x: x[1] if x[2] is None else (x[1] * 0.5 + x[2] * 0.5), reverse=True)
         return candidate_results[:top_k]
 
 

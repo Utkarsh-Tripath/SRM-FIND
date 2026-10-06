@@ -38,6 +38,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPLOADS_DIR = os.path.join(PROJECT_ROOT, "data", "uploads")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
 # Initialize Core AI Components
 dataset = generate_dataset()
 text_encoder = TransformerTextEncoder()
@@ -65,18 +69,20 @@ class ReportItemRequest(BaseModel):
     location_name: str
     coordinates: Optional[List[float]] = [12.8231, 80.0442]
     timestamp: str
-    image_filename: Optional[str] = "default_item.jpg"
+    image_filename: Optional[str] = None
+    image_data: Optional[str] = None  # Optional photo as a base64 data URL
 
 
 class SearchMatchRequest(BaseModel):
     query_description: str
     target_status: str = "FOUND"
+    location_name: Optional[str] = "Reported location"
     category: Optional[str] = None
     color: Optional[str] = None
     brand: Optional[str] = None
     coordinates: Optional[List[float]] = [12.8231, 80.0442]
     timestamp: Optional[str] = "2026-10-05T12:00:00"
-    image_filename: Optional[str] = "default_item.jpg"
+    image_data: Optional[str] = None  # Optional photo as a base64 data URL
     weights: Optional[Dict[str, float]] = None
 
 
@@ -90,35 +96,40 @@ def get_dataset():
     return {"total_records": len(vector_db.records), "records": vector_db.records}
 
 
-@app.post("/api/report/lost")
-def report_lost_item(report: ReportItemRequest):
-    new_id = f"LOST_{len(vector_db.records) + 101}"
-    record = report.dict()
+def build_report_record(report: ReportItemRequest, id_prefix: str) -> Dict[str, Any]:
+    """Create a record from a submitted report, saving its photo (if any) and indexing its embeddings."""
+    new_id = f"{id_prefix}_{len(vector_db.records) + 101}"
+    record = report.model_dump(exclude={"image_data"})
     record["id"] = new_id
     record["data_source"] = "USER_SUBMITTED"
-    
-    # Run GenAI normalization
-    norm = GenAINormalizerEngine.normalize_description(report.description)
-    record["category"] = norm["normalized_category"] if report.category == "other" else report.category
-    
+
+    img = ImageEncoder.decode_data_url(report.image_data)
+    if report.image_data and img is None:
+        raise HTTPException(status_code=400, detail="Uploaded photo could not be read as an image.")
+    if img is not None:
+        img.thumbnail((800, 800))
+        img.save(os.path.join(UPLOADS_DIR, f"{new_id}.jpg"), "JPEG", quality=85)
+        record["image_filename"] = os.path.join(UPLOADS_DIR, f"{new_id}.jpg")
+        record["image_url"] = f"/uploads/{new_id}.jpg"
+
     t_emb = text_encoder.encode(record["description"])
-    i_emb = image_encoder.encode(record["image_filename"])
+    i_emb = image_encoder.encode(img)
     vector_db.add_record(record, t_emb, i_emb)
-    
+    return record
+
+
+@app.post("/api/report/lost")
+def report_lost_item(report: ReportItemRequest):
+    # Run GenAI normalization
+    if report.category == "other":
+        report.category = GenAINormalizerEngine.normalize_description(report.description)["normalized_category"]
+    record = build_report_record(report, "LOST")
     return {"message": "Lost report created successfully", "record": record}
 
 
 @app.post("/api/report/found")
 def report_found_item(report: ReportItemRequest):
-    new_id = f"FOUND_{len(vector_db.records) + 101}"
-    record = report.dict()
-    record["id"] = new_id
-    record["data_source"] = "USER_SUBMITTED"
-    
-    t_emb = text_encoder.encode(record["description"])
-    i_emb = image_encoder.encode(record["image_filename"])
-    vector_db.add_record(record, t_emb, i_emb)
-    
+    record = build_report_record(report, "FOUND")
     return {"message": "Found report created successfully", "record": record}
 
 
@@ -133,13 +144,16 @@ def search_matches(req: SearchMatchRequest):
     5. Triggers notification if score >= threshold.
     """
     q_t_emb = text_encoder.encode(req.query_description)
-    q_i_emb = image_encoder.encode(req.image_filename)
+    query_img = ImageEncoder.decode_data_url(req.image_data)
+    if req.image_data and query_img is None:
+        raise HTTPException(status_code=400, detail="Uploaded photo could not be read as an image.")
+    q_i_emb = image_encoder.encode(query_img)  # None when no photo was uploaded
     
     # Configure custom fusion weights if provided
     custom_fusion = MultimodalFusionEngine(req.weights) if req.weights else fusion_engine
     
     # 1. Vector Retrieval
-    candidates = vector_db.search(q_t_emb[0], q_i_emb[0], target_status=req.target_status, top_k=5)
+    candidates = vector_db.search(q_t_emb[0], q_i_emb, target_status=req.target_status, top_k=5)
     
     match_results = []
     
@@ -148,8 +162,10 @@ def search_matches(req: SearchMatchRequest):
         "category": req.category,
         "color": req.color,
         "brand": req.brand,
+        "location_name": req.location_name,
         "coordinates": req.coordinates,
-        "timestamp": req.timestamp
+        "timestamp": req.timestamp,
+        "has_photo": query_img is not None
     }
     
     for rec, t_sim, i_sim in candidates:
@@ -196,7 +212,7 @@ def get_notifications():
 
 @app.get("/api/evaluation")
 def get_evaluation_metrics():
-    evaluator = SystemEvaluator(vector_db.records)
+    evaluator = SystemEvaluator(vector_db.records, text_encoder, image_encoder)
     return evaluator.evaluate_all()
 
 
@@ -206,10 +222,11 @@ def generate_synthetic_samples(item: str, color: str, brand: str, location: str)
     return {"original": f"{color} {brand} {item} lost near {location}", "synthetic_paraphrases": variations}
 
 
-# Serve Frontend Web App
-frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+# Serve Frontend Web App and uploaded item photos
+frontend_dir = os.path.join(PROJECT_ROOT, "frontend")
 if os.path.exists(frontend_dir):
     app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 @app.get("/", response_class=HTMLResponse)
 def serve_index():

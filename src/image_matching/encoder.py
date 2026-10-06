@@ -6,9 +6,11 @@ Calculates visual cosine similarity between uploaded images.
 """
 
 import os
+import io
+import base64
 import numpy as np
 from PIL import Image, ImageOps
-from typing import Union
+from typing import Optional, Union
 
 try:
     import torch
@@ -100,14 +102,17 @@ class ImageEncoder:
             feature_vector = feature_vector / norm
         return feature_vector
 
-    def encode(self, image_input: Union[str, Image.Image]) -> np.ndarray:
-        """Encode an image path or PIL Image into a feature embedding vector."""
+    def encode(self, image_input: Union[str, Image.Image, None]) -> Optional[np.ndarray]:
+        """
+        Encode an image path or PIL Image into a feature embedding vector.
+        Returns None when no image is available, so the fusion engine can treat
+        the visual modality as missing instead of comparing meaningless vectors.
+        """
+        if image_input is None:
+            return None
         if isinstance(image_input, str):
             if not os.path.exists(image_input):
-                # Return dummy synthetic vector if file does not exist
-                np.random.seed(abs(hash(image_input)) % (2**32 - 1))
-                vec = np.random.randn(512)
-                return vec / np.linalg.norm(vec)
+                return None
             img = Image.open(image_input)
         else:
             img = image_input
@@ -125,10 +130,25 @@ class ImageEncoder:
         else:
             return self.extract_composite_features(img)
 
-    def predict_similarity(self, img1_input: Union[str, Image.Image], img2_input: Union[str, Image.Image]) -> float:
-        """Compute visual similarity score between two images."""
+    @staticmethod
+    def decode_data_url(data_url: str) -> Optional[Image.Image]:
+        """Decode a browser 'data:image/...;base64,...' upload into a PIL Image."""
+        if not data_url:
+            return None
+        try:
+            encoded = data_url.split(",", 1)[1] if "," in data_url else data_url
+            img = Image.open(io.BytesIO(base64.b64decode(encoded)))
+            img = ImageOps.exif_transpose(img)
+            return img.convert("RGB")
+        except Exception:
+            return None
+
+    def predict_similarity(self, img1_input: Union[str, Image.Image], img2_input: Union[str, Image.Image]) -> Optional[float]:
+        """Compute visual similarity score between two images (None if either image is missing)."""
         v1 = self.encode(img1_input)
         v2 = self.encode(img2_input)
+        if v1 is None or v2 is None:
+            return None
         return compute_cosine_similarity(v1, v2)
 
 

@@ -19,15 +19,22 @@ class SystemEvaluator:
     Runs experimental benchmarks comparing Baselines vs Proposed Multimodal Architecture.
     """
     
-    def __init__(self, dataset: List[Dict[str, Any]]):
-        self.dataset = dataset
-        self.text_encoder = TransformerTextEncoder()
-        self.image_encoder = ImageEncoder()
+    def __init__(
+        self,
+        dataset: List[Dict[str, Any]],
+        text_encoder: TransformerTextEncoder = None,
+        image_encoder: ImageEncoder = None
+    ):
+        # Only curated records carry ground-truth match labels, so user-submitted reports are excluded
+        self.dataset = [r for r in dataset if r.get("data_source") == "REAL_CURATED"]
+        # Reuse already-loaded encoders when provided, to avoid reloading model weights on every run
+        self.text_encoder = text_encoder or TransformerTextEncoder()
+        self.image_encoder = image_encoder or ImageEncoder()
         self.fusion_engine = MultimodalFusionEngine()
         self.tfidf_matcher = TfidfBaselineMatcher()
         
         # Fit vectorizers on dataset corpus
-        corpus = [r["description"] for r in dataset]
+        corpus = [r["description"] for r in self.dataset]
         self.tfidf_matcher.fit(corpus)
         self.text_encoder.fit_fallback(corpus)
 
@@ -54,7 +61,13 @@ class SystemEvaluator:
             "Baseline 4 (Image Only)", 
             "Proposed Multimodal"
         ]
-        results_by_model = {m: {"tp": 0, "fp": 0, "fn": 0, "tn": 0, "mrr_sum": 0.0, "r_at_1": 0, "r_at_3": 0} for m in models_to_test}
+        results_by_model = {m: {"tp": 0, "fp": 0, "fn": 0, "tn": 0, "mrr_sum": 0.0, "r_at_1": 0, "r_at_3": 0, "evaluated": 0} for m in models_to_test}
+
+        def image_similarity(q_emb, f_emb):
+            # None when either report has no photo (visual modality missing)
+            if q_emb is None or f_emb is None:
+                return None
+            return compute_cosine_similarity(q_emb, f_emb)
 
         for lost in lost_items:
             target_match_id = lost["match_target_id"]
@@ -65,6 +78,10 @@ class SystemEvaluator:
             
             # Evaluate each baseline and proposed model
             for model_name in models_to_test:
+                # The image-only baseline can only be scored when the query has a photo
+                if model_name == "Baseline 4 (Image Only)" and q_i_emb is None:
+                    continue
+                results_by_model[model_name]["evaluated"] += 1
                 scored_candidates = []
                 
                 for found_idx, found in enumerate(found_items):
@@ -75,10 +92,10 @@ class SystemEvaluator:
                     elif model_name == "Baseline 3 (Transformer Text)":
                         score = compute_cosine_similarity(q_t_emb[0], found_t_embs[found_idx][0])
                     elif model_name == "Baseline 4 (Image Only)":
-                        score = compute_cosine_similarity(q_i_emb[0], found_i_embs[found_idx][0])
+                        score = image_similarity(q_i_emb, found_i_embs[found_idx]) or 0.0
                     elif model_name == "Proposed Multimodal":
                         t_sim = compute_cosine_similarity(q_t_emb[0], found_t_embs[found_idx][0])
-                        i_sim = compute_cosine_similarity(q_i_emb[0], found_i_embs[found_idx][0])
+                        i_sim = image_similarity(q_i_emb, found_i_embs[found_idx])
                         loc_sim = compute_location_similarity(lost["coordinates"], found["coordinates"])
                         time_sim = compute_time_similarity(lost["timestamp"], found["timestamp"])
                         attr_sim = compute_attribute_similarity(lost, found)
@@ -121,9 +138,14 @@ class SystemEvaluator:
 
         # Compute summary metrics table
         summary_table = []
-        num_queries = len(lost_items)
         
         for model_name, counts in results_by_model.items():
+            num_queries = counts["evaluated"]
+            if num_queries == 0:
+                # No query in the dataset carries a photo, so this baseline cannot be measured
+                summary_table.append({"Model": model_name, **{k: "N/A" for k in
+                    ["Accuracy", "Precision", "Recall", "F1 Score", "Recall@1", "Recall@3", "MRR"]}})
+                continue
             tp, fp, fn, tn = counts["tp"], counts["fp"], counts["fn"], counts["tn"]
             acc = (tp + tn) / max(1, (tp + fp + fn + tn))
             prec = tp / max(1, (tp + fp))
@@ -145,7 +167,7 @@ class SystemEvaluator:
             })
             
         return {
-            "total_eval_queries": num_queries,
+            "total_eval_queries": len(lost_items),
             "comparison_matrix": summary_table
         }
 
